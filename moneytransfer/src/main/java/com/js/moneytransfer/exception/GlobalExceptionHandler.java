@@ -22,13 +22,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientFundsException.class)
     public ResponseEntity<String> handleInsufficientFundsException(InsufficientFundsException e) {
-        String formattedMessage = String.format(AppConstants.INSUFFICIENT_BALANCE, e.getMessage());
+        String formattedMessage = String.format("Insufficient balance in debit account for owner ID: %s", e.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(formattedMessage);
     }
 
     @ExceptionHandler(ExchangeRateNotFoundException.class)
     public ResponseEntity<String> handleExchangeRateNotFoundException(ExchangeRateNotFoundException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(e.getMessage());
+    }
+
+    @ExceptionHandler(UnsupportedCurrencyException.class)
+    public ResponseEntity<String> handleUnsupportedCurrencyException(UnsupportedCurrencyException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

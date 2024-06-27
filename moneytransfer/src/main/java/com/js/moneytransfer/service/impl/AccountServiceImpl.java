@@ -3,9 +3,10 @@ package com.js.moneytransfer.service.impl;
 import com.js.moneytransfer.dto.AccountDTO;
 import com.js.moneytransfer.entity.Account;
 import com.js.moneytransfer.exception.AccountNotFoundException;
-import com.js.moneytransfer.exception.ExchangeRateNotFoundException;
 import com.js.moneytransfer.exception.InsufficientFundsException;
 import com.js.moneytransfer.exception.LockAcquisitionException;
+import com.js.moneytransfer.exception.UnsupportedCurrencyException;
+import com.js.moneytransfer.exception.UnexpectedTransferException;
 import com.js.moneytransfer.mapper.AccountMapper;
 import com.js.moneytransfer.repository.AccountRepository;
 import com.js.moneytransfer.service.AccountService;
@@ -51,13 +52,12 @@ public class AccountServiceImpl implements AccountService {
 
             if (fromAccount.getBalance().compareTo(amount) < 0) {
                 log.error(AppConstants.INSUFFICIENT_BALANCE, fromOwnerId);
-                throw new InsufficientFundsException(fromOwnerId.toString());
-            }
+                throw new InsufficientFundsException(fromOwnerId.toString());            }
 
             String fromCurrency = fromAccount.getCurrency();
             String toCurrency = toAccount.getCurrency();
-            BigDecimal exchangeRate = exchangeRateService.getExchangeRate(fromCurrency, toCurrency);
-
+            BigDecimal exchangeRate;
+            exchangeRate = exchangeRateService.getExchangeRate(fromCurrency, toCurrency);
             BigDecimal convertedAmount = amount.multiply(exchangeRate);
 
             fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
@@ -66,10 +66,16 @@ public class AccountServiceImpl implements AccountService {
             accountRepository.save(fromAccount);
             accountRepository.save(toAccount);
 
-                log.info(AppConstants.TRANSFER_SUCCESS, fromOwnerId, toOwnerId);
+            log.info(AppConstants.TRANSFER_SUCCESS, fromOwnerId, toOwnerId);
         } catch (PessimisticLockingFailureException e) {
             log.error(AppConstants.LOCK_ACQUISITION_ERROR, fromOwnerId, toOwnerId);
-            throw new LockAcquisitionException(String.format(AppConstants.LOCK_ACQUISITION_ERROR, fromOwnerId, toOwnerId), e);
+            throw new LockAcquisitionException(String.format("Failed to acquire lock for accounts %d or %d", fromOwnerId, toOwnerId), e);
+        } catch (AccountNotFoundException | InsufficientFundsException | UnsupportedCurrencyException e) {
+            log.error("Transfer failed: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error during transfer from {} to {}: {}", fromOwnerId, toOwnerId, e.getMessage());
+            throw new UnexpectedTransferException(String.format("Unexpected error during transfer from %d to %d", fromOwnerId, toOwnerId), e);
         }
     }
 
